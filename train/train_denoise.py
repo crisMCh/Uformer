@@ -43,13 +43,16 @@ from timm.utils import NativeScaler
 
 # from utils.loader import  get_training_data,get_validation_data
 
+#This allows PyTorch to allocate GPU memory more flexibly, reducing fragmentation.
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 
 
 ######### Logs dir ###########
 log_dir = os.path.join(opt.save_dir, 'denoising', opt.dataset, opt.arch+opt.env)
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
-logname = os.path.join(log_dir, datetime.datetime.now().isoformat()+'.txt') 
+logname = os.path.join(log_dir, 'log.txt')
 print("Now time is : ",datetime.datetime.now().isoformat())
 result_dir = os.path.join(log_dir, 'results')
 model_dir  = os.path.join(log_dir, 'models')
@@ -126,12 +129,15 @@ criterion = CharbonnierLoss().cuda()
 ######### DataLoader ###########
 print('===> Loading datasets')
 img_options_train = {'patch_size':opt.train_ps}
+print(f"======HEREEEEE:{opt.train_dir}")
 train_dataset = get_training_data(opt.train_dir, img_options_train)
 train_loader = DataLoader(dataset=train_dataset, batch_size=opt.batch_size, shuffle=True, 
         num_workers=opt.train_workers, pin_memory=False, drop_last=False)
 val_dataset = get_validation_data(opt.val_dir)
 val_loader = DataLoader(dataset=val_dataset, batch_size=opt.batch_size, shuffle=False, 
         num_workers=opt.eval_workers, pin_memory=False, drop_last=False)
+print(val_loader)
+
 
 len_trainset = train_dataset.__len__()
 len_valset = val_dataset.__len__()
@@ -144,6 +150,7 @@ with torch.no_grad():
     for ii, data_val in enumerate((val_loader), 0):
         target = data_val[0].cuda()
         input_ = data_val[1].cuda()
+        #print(input_.shape)
         with torch.cuda.amp.autocast():
             restored = model_restoration(input_)
             restored = torch.clamp(restored,0,1)  
@@ -158,7 +165,7 @@ print('===> Start Epoch {} End Epoch {}'.format(start_epoch,opt.nepoch))
 best_psnr = 0
 best_epoch = 0
 best_iter = 0
-eval_now = len(train_loader)//4
+eval_now = max(1, len(train_loader) // 4)
 print("\nEvaluation after every {} Iterations !!!\n".format(eval_now))
 
 loss_scaler = NativeScaler()

@@ -2,7 +2,7 @@ import numpy as np
 import os
 from torch.utils.data import Dataset
 import torch
-from utils import is_png_file, load_img, Augment_RGB_torch
+from utils import is_png_file, load_img, Augment_RGB_torch, load_npy, is_numpy_file
 import torch.nn.functional as F
 import random
 from PIL import Image
@@ -29,8 +29,8 @@ class DataLoaderTrain(Dataset):
         clean_files = sorted(os.listdir(os.path.join(rgb_dir, gt_dir)))
         noisy_files = sorted(os.listdir(os.path.join(rgb_dir, input_dir)))
         
-        self.clean_filenames = [os.path.join(rgb_dir, gt_dir, x) for x in clean_files if is_png_file(x)]
-        self.noisy_filenames = [os.path.join(rgb_dir, input_dir, x)       for x in noisy_files if is_png_file(x)]
+        self.clean_filenames = [os.path.join(rgb_dir, gt_dir, x) for x in clean_files if is_numpy_file(x)]
+        self.noisy_filenames = [os.path.join(rgb_dir, input_dir, x)       for x in noisy_files if is_numpy_file(x)]
         
         self.img_options=img_options
 
@@ -41,11 +41,17 @@ class DataLoaderTrain(Dataset):
 
     def __getitem__(self, index):
         tar_index   = index % self.tar_size
-        clean = torch.from_numpy(np.float32(load_img(self.clean_filenames[tar_index])))
-        noisy = torch.from_numpy(np.float32(load_img(self.noisy_filenames[tar_index])))
+        clean = torch.from_numpy(np.float32(load_npy(self.clean_filenames[tar_index])))
+        noisy = torch.from_numpy(np.float32(load_npy(self.noisy_filenames[tar_index])))
+
+        # Add a channel dimension for grayscale images
+        if clean.dim() == 2:  # If it's a 2D tensor, add a channel dimension
+            clean = clean.unsqueeze(0)  # Shape becomes (1, 512, 512)
+        if noisy.dim() == 2:
+            noisy = noisy.unsqueeze(0)  # Shape becomes (1, 512, 512)
         
-        clean = clean.permute(2,0,1)
-        noisy = noisy.permute(2,0,1)
+        #clean = clean.permute(2,0,1)
+        #noisy = noisy.permute(2,0,1)
 
         clean_filename = os.path.split(self.clean_filenames[tar_index])[-1]
         noisy_filename = os.path.split(self.noisy_filenames[tar_index])[-1]
@@ -68,7 +74,8 @@ class DataLoaderTrain(Dataset):
         apply_trans = transforms_aug[random.getrandbits(3)]
 
         clean = getattr(augment, apply_trans)(clean)
-        noisy = getattr(augment, apply_trans)(noisy)        
+        noisy = getattr(augment, apply_trans)(noisy)   
+             
 
         return clean, noisy, clean_filename, noisy_filename
 
@@ -87,8 +94,8 @@ class DataLoaderVal(Dataset):
         noisy_files = sorted(os.listdir(os.path.join(rgb_dir, input_dir)))
 
 
-        self.clean_filenames = [os.path.join(rgb_dir, gt_dir, x) for x in clean_files if is_png_file(x)]
-        self.noisy_filenames = [os.path.join(rgb_dir, input_dir, x) for x in noisy_files if is_png_file(x)]
+        self.clean_filenames = [os.path.join(rgb_dir, gt_dir, x) for x in clean_files if is_numpy_file(x)]
+        self.noisy_filenames = [os.path.join(rgb_dir, input_dir, x) for x in noisy_files if is_numpy_file(x)]
         
 
         self.tar_size = len(self.clean_filenames)  
@@ -100,14 +107,23 @@ class DataLoaderVal(Dataset):
         tar_index   = index % self.tar_size
         
 
-        clean = torch.from_numpy(np.float32(load_img(self.clean_filenames[tar_index])))
-        noisy = torch.from_numpy(np.float32(load_img(self.noisy_filenames[tar_index])))
+        clean = torch.from_numpy(np.float32(load_npy(self.clean_filenames[tar_index])))
+        noisy = torch.from_numpy(np.float32(load_npy(self.noisy_filenames[tar_index])))
+
+        # Add a channel dimension for grayscale images
+        if clean.dim() == 2:  # If it's a 2D tensor, add a channel dimension
+            clean = clean.unsqueeze(0)  # Shape becomes (1, 512, 512)
+        if noisy.dim() == 2:
+            noisy = noisy.unsqueeze(0)  # Shape becomes (1, 512, 512)
+
                 
         clean_filename = os.path.split(self.clean_filenames[tar_index])[-1]
         noisy_filename = os.path.split(self.noisy_filenames[tar_index])[-1]
-
-        clean = clean.permute(2,0,1)
-        noisy = noisy.permute(2,0,1)
+        #In RGB the image would be ((H, W, C) C = number of chanels (3), and the permute is used to get to shape (C, H, W).
+        # In this case of Gray values, the shape is already (C, H, W).
+        #clean = clean.permute(2,0,1)
+        #noisy = noisy.permute(2,0,1)
+        
 
         return clean, noisy, clean_filename, noisy_filename
 
@@ -118,7 +134,8 @@ class DataLoaderTest(Dataset):
         super(DataLoaderTest, self).__init__()
 
         inp_files = sorted(os.listdir(inp_dir))
-        self.inp_filenames = [os.path.join(inp_dir, x) for x in inp_files if is_image_file(x)]
+        #here: needs change to work with numpy
+        self.inp_filenames = [os.path.join(inp_dir, x) for x in inp_files if is_image_file(x)] 
 
         self.inp_size = len(self.inp_filenames)
         self.img_options = img_options

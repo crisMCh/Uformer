@@ -16,12 +16,18 @@ class FastLeFF(nn.Module):
     def __init__(self, dim=32, hidden_dim=128, act_layer=nn.GELU,drop = 0.):
         super().__init__()
 
-        from torch_dwconv import depthwise_conv2d, DepthwiseConv2d
+        #CANNOT INSTALL THE DAMN torch_dwconv
+        #from torch_dwconv import depthwise_conv2d, DepthwiseConv2d
 
         self.linear1 = nn.Sequential(nn.Linear(dim, hidden_dim),
                                 act_layer())
-        self.dwconv = nn.Sequential(DepthwiseConv2d(hidden_dim, hidden_dim, kernel_size=3,stride=1,padding=1),
+        
+        #self.dwconv = nn.Sequential(DepthwiseConv2d(hidden_dim, hidden_dim, kernel_size=3,stride=1,padding=1),
+        #                act_layer())
+        # Depthwise Convolution (using groups to make it depthwise)
+        self.dwconv = nn.Sequential(nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, stride=1, padding=1, groups=hidden_dim),
                         act_layer())
+
         self.linear2 = nn.Sequential(nn.Linear(hidden_dim, dim))
         self.dim = dim
         self.hidden_dim = hidden_dim
@@ -109,7 +115,8 @@ class UNet(nn.Module):
         super(UNet, self).__init__()
 
         self.dim = dim
-        self.ConvBlock1 = ConvBlock(3, dim, strides=1)
+        # Change input channels to 1 (grayscale)
+        self.ConvBlock1 = ConvBlock(1, dim, strides=1)
         self.pool1 = nn.Conv2d(dim,dim,kernel_size=4, stride=2, padding=1)
 
         self.ConvBlock2 = block(dim, dim*2, strides=1)
@@ -135,7 +142,8 @@ class UNet(nn.Module):
         self.upv9 = nn.ConvTranspose2d(dim*2, dim, 2, stride=2)
         self.ConvBlock9 = block(dim*2, dim, strides=1)
 
-        self.conv10 = nn.Conv2d(dim, 3, kernel_size=3, stride=1, padding=1)
+        # Output layer should have 1 channel for grayscale output       
+        self.conv10 = nn.Conv2d(dim, 1, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
         conv1 = self.ConvBlock1(x)
@@ -779,7 +787,7 @@ class Upsample(nn.Module):
 
 # Input Projection
 class InputProj(nn.Module):
-    def __init__(self, in_channel=3, out_channel=64, kernel_size=3, stride=1, norm_layer=None,act_layer=nn.LeakyReLU):
+    def __init__(self, in_channel=1, out_channel=64, kernel_size=3, stride=1, norm_layer=None,act_layer=nn.LeakyReLU):
         super().__init__()
         self.proj = nn.Sequential(
             nn.Conv2d(in_channel, out_channel, kernel_size=3, stride=stride, padding=kernel_size//2),
@@ -811,7 +819,7 @@ class InputProj(nn.Module):
 
 # Output Projection
 class OutputProj(nn.Module):
-    def __init__(self, in_channel=64, out_channel=3, kernel_size=3, stride=1, norm_layer=None,act_layer=None):
+    def __init__(self, in_channel=64, out_channel=1, kernel_size=3, stride=1, norm_layer=None,act_layer=None):
         super().__init__()
         self.proj = nn.Sequential(
             nn.Conv2d(in_channel, out_channel, kernel_size=3, stride=stride, padding=kernel_size//2),
@@ -1067,7 +1075,7 @@ class BasicUformerLayer(nn.Module):
 
 
 class Uformer(nn.Module):
-    def __init__(self, img_size=256, in_chans=3, dd_in=3,
+    def __init__(self, img_size=256, in_chans=1, dd_in=1,
                  embed_dim=32, depths=[2, 2, 2, 2, 2, 2, 2, 2, 2], num_heads=[1, 2, 4, 8, 16, 16, 8, 4, 2],
                  win_size=8, mlp_ratio=4., qkv_bias=True, qk_scale=None,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
@@ -1302,7 +1310,7 @@ class Uformer(nn.Module):
 
         # Output Projection
         y = self.output_proj(deconv3)
-        return x + y if self.dd_in ==3 else y
+        return x + y if self.dd_in ==1 else y
 
     def flops(self):
         flops = 0
