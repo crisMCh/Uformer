@@ -24,13 +24,13 @@ class DataLoaderTrain(Dataset):
         self.target_transform = target_transform
         
         gt_dir = 'groundtruth' 
-        input_dir = 'input'
+        input_dir = 'input/20000'
         
         clean_files = sorted(os.listdir(os.path.join(rgb_dir, gt_dir)))
         noisy_files = sorted(os.listdir(os.path.join(rgb_dir, input_dir)))
         
         self.clean_filenames = [os.path.join(rgb_dir, gt_dir, x) for x in clean_files if is_numpy_file(x)]
-        self.noisy_filenames = [os.path.join(rgb_dir, input_dir, x)       for x in noisy_files if is_numpy_file(x)]
+        self.noisy_filenames = [os.path.join(rgb_dir, input_dir, x)  for x in noisy_files if is_numpy_file(x)]
         
         self.img_options=img_options
 
@@ -92,6 +92,7 @@ class DataLoaderVal(Dataset):
         
         clean_files = sorted(os.listdir(os.path.join(rgb_dir, gt_dir)))
         noisy_files = sorted(os.listdir(os.path.join(rgb_dir, input_dir)))
+        print("Data loader val init")
 
 
         self.clean_filenames = [os.path.join(rgb_dir, gt_dir, x) for x in clean_files if is_numpy_file(x)]
@@ -115,6 +116,8 @@ class DataLoaderVal(Dataset):
             clean = clean.unsqueeze(0)  # Shape becomes (1, 512, 512)
         if noisy.dim() == 2:
             noisy = noisy.unsqueeze(0)  # Shape becomes (1, 512, 512)
+
+        #print("Data loader val get item")
 
                 
         clean_filename = os.path.split(self.clean_filenames[tar_index])[-1]
